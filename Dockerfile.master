@@ -20,7 +20,7 @@ RUN apt-get update -y && \
 # In production, use proper certificate handling
 RUN python3 -m venv /opt/saltstack/salt && \
     /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org --upgrade pip && \
-    /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org salt
+    /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org  'salt[all]'
 
 # Create symlinks for salt commands
 RUN for cmd in salt salt-master salt-minion salt-key salt-run salt-call salt-cloud salt-ssh salt-api salt-syndic; do \
