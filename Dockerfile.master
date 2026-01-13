@@ -15,12 +15,14 @@ RUN apt-get update -y && \
     apt-get clean all && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Salt from PyPI (latest 3007.x series)
+# Install Salt from PyPI (latest 3007.x series) with all dependencies
 # Note: Using --trusted-host to work around cert issues in restrictive environments
 # In production, use proper certificate handling
 RUN python3 -m venv /opt/saltstack/salt && \
-    /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org --upgrade pip && \
-    /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org  'salt[all]'
+    /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org --upgrade pip setuptools && \
+    /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org \
+        packaging distro looseversion PyYAML jinja2 msgpack requests tornado pycryptodome pyzmq markupsafe && \
+    /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org salt
 
 # Create symlinks for salt commands
 RUN for cmd in salt salt-master salt-minion salt-key salt-run salt-call salt-cloud salt-ssh salt-api salt-syndic; do \
