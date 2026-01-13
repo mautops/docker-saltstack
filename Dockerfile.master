@@ -22,7 +22,7 @@ RUN apt-get update -y && \
 RUN python3 -m venv /opt/saltstack/salt && \
     /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org --upgrade pip setuptools && \
     /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org \
-        packaging distro PyYAML jinja2 msgpack requests tornado pycryptodome pyzmq markupsafe && \
+        packaging distro PyYAML jinja2 msgpack requests tornado pycryptodome pyzmq markupsafe cherrypy && \
     /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org salt
 
 # Create symlinks for salt commands
@@ -33,7 +33,32 @@ RUN for cmd in salt salt-master salt-minion salt-key salt-run salt-call salt-clo
 # Create configuration directories
 RUN mkdir -p /etc/salt /var/cache/salt /var/log/salt /var/run/salt
 
-# Configure master to auto-accept minions
-RUN echo "auto_accept: True" > /etc/salt/master
+# Configure master to auto-accept minions and enable Salt API
+RUN echo "auto_accept: True" > /etc/salt/master && \
+    echo "" >> /etc/salt/master && \
+    echo "# Salt API Configuration" >> /etc/salt/master && \
+    echo "rest_cherrypy:" >> /etc/salt/master && \
+    echo "  port: 8000" >> /etc/salt/master && \
+    echo "  host: 0.0.0.0" >> /etc/salt/master && \
+    echo "  disable_ssl: True  # Enable SSL in production" >> /etc/salt/master && \
+    echo "  debug: True" >> /etc/salt/master && \
+    echo "" >> /etc/salt/master && \
+    echo "# External Authentication - sharedsecret for development" >> /etc/salt/master && \
+    echo "# For production, use PAM or other secure authentication" >> /etc/salt/master && \
+    echo "external_auth:" >> /etc/salt/master && \
+    echo "  sharedsecret:" >> /etc/salt/master && \
+    echo "    salt:" >> /etc/salt/master && \
+    echo "      - '.*'" >> /etc/salt/master && \
+    echo "      - '@wheel'" >> /etc/salt/master && \
+    echo "      - '@runner'" >> /etc/salt/master && \
+    echo "      - '@jobs'" >> /etc/salt/master && \
+    echo "sharedsecret: changeme_insecure_default" >> /etc/salt/master
 
-ENTRYPOINT ["salt-master", "-l", "debug"]
+# Expose Salt ports: 4505 (publish), 4506 (return), 8000 (API)
+EXPOSE 4505 4506 8000
+
+# Start both salt-master and salt-api
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

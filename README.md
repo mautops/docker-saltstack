@@ -59,6 +59,7 @@ If you are running more than one minion with `--scale=2`, you will need to use `
 - **Ubuntu 24.04 LTS** - Modern, long-term supported base OS
 - **Modern packaging** - Uses Python virtual environment with PyPI installation for better isolation
 - **Improved Dockerfiles** - Cleaner, more maintainable configuration
+- **Salt API Enabled** - REST API exposed on port 8000 for external automation and integration
 
 ### Migration from Old Version
 
@@ -66,3 +67,92 @@ The old setup used Ubuntu 18.04 and Salt installed from the deprecated `repo.sal
 - Uses official PyPI packages
 - Provides better security and maintainability  
 - Maintains backward compatibility with existing Salt states and configurations
+- Adds Salt API for programmatic access
+
+## Salt API Usage
+
+The Salt Master now includes the Salt API (rest_cherrypy) exposed on port 8000. This allows you to control Salt programmatically from external applications.
+
+### Quick API Examples
+
+**1. Login and get a token:**
+```bash
+curl -sSk http://localhost:8000/login \
+  -H "Accept: application/json" \
+  -d username=salt \
+  -d password=changeme_insecure_default \
+  -d eauth=sharedsecret
+```
+
+**2. Execute commands using the token:**
+```bash
+# Replace YOUR_TOKEN with the token from login response
+curl -sSk http://localhost:8000 \
+  -H "Accept: application/json" \
+  -H "X-Auth-Token: YOUR_TOKEN" \
+  -d client=local \
+  -d tgt='*' \
+  -d fun=test.ping
+```
+
+**3. Get minion status:**
+```bash
+curl -sSk http://localhost:8000 \
+  -H "Accept: application/json" \
+  -H "X-Auth-Token: YOUR_TOKEN" \
+  -d client=local \
+  -d tgt='*' \
+  -d fun=status.uptime
+```
+
+### Security Configuration
+
+**⚠️ IMPORTANT FOR PRODUCTION:**
+
+The default configuration uses:
+- HTTP (not HTTPS) - `disable_ssl: True`
+- Shared secret authentication with default password `changeme_insecure_default`
+
+**For production environments, you should:**
+
+1. **Enable SSL/TLS:**
+   - Generate SSL certificates
+   - Update `/etc/salt/master` to use `ssl_crt` and `ssl_key`
+   - Remove `disable_ssl: True`
+
+2. **Use secure authentication:**
+   - Change the shared secret by setting `SALT_SHARED_SECRET` environment variable
+   - Or switch to PAM authentication for user-based access control
+   - Configure granular permissions in `external_auth`
+
+3. **Example with custom secret:**
+```bash
+SALT_SHARED_SECRET=your_secure_secret_here docker compose up
+```
+
+### API Documentation
+
+For full API documentation, see:
+- [Salt API Documentation](https://docs.saltproject.io/en/latest/ref/netapi/all/salt.netapi.rest_cherrypy.html)
+- [External Authentication](https://docs.saltproject.io/en/latest/topics/eauth/index.html)
+
+### API Test Scripts
+
+Two test scripts are provided to help you get started:
+
+1. **Bash Script (`test-api.sh`)** - Simple curl-based examples
+   ```bash
+   ./test-api.sh
+   ```
+
+2. **Python Script (`test-api.py`)** - Python client example with reusable class
+   ```bash
+   pip install requests  # Install requests library first
+   ./test-api.py
+   ```
+
+These scripts demonstrate:
+- Authentication and token management
+- Basic minion commands
+- Gathering system information
+- Executing shell commands via Salt
