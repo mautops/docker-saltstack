@@ -1,8 +1,8 @@
-FROM alpine
+FROM alpine:latest
 MAINTAINER tim@cyface.com
 
-RUN apk --no-cache update &&\
-    apk --no-cache upgrade &&\
+RUN apk --no-cache update && \
+    apk --no-cache upgrade && \
     apk --no-cache add git openssl salt-minion
 
 RUN sed -i "s|#master: salt|master: salt-master|g" /etc/salt/minion

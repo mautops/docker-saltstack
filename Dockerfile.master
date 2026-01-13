@@ -1,18 +1,66 @@
-FROM ubuntu:18.04
-MAINTAINER tim@cyface.com
+FROM ubuntu:24.04
+LABEL maintainer="tim@cyface.com"
+LABEL description="Salt Master with latest Salt version"
 
-ENV APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
-RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
-RUN apt-get update -y
-RUN apt-get install apt-utils wget gnupg -y
-RUN wget -q https://repo.saltstack.com/py3/ubuntu/18.04/amd64/latest/SALTSTACK-GPG-KEY.pub && \
-    apt-key add SALTSTACK-GPG-KEY.pub && \
-    rm SALTSTACK-GPG-KEY.pub
-RUN echo "deb http://repo.saltstack.com/py3/ubuntu/18.04/amd64/latest bionic main" > /etc/apt/sources.list.d/saltstack.list
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install dependencies
 RUN apt-get update -y && \
-    apt-get install salt-master salt-minion salt-ssh salt-syndic salt-cloud salt-api -y && \
-    apt-get clean all
+    apt-get install -y \
+        python3 \
+        python3-pip \
+        python3-venv \
+        curl \
+        ca-certificates && \
+    apt-get clean all && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN sed -i "s|#auto_accept: False|auto_accept: True|g" /etc/salt/master
+# Install Salt from PyPI (latest 3007.x series) with all dependencies
+# SECURITY NOTE: Using --trusted-host flags to bypass SSL verification
+# This is ONLY for development/testing in restricted network environments
+# For production, ensure proper CA certificates are installed and remove --trusted-host flags
+RUN python3 -m venv /opt/saltstack/salt && \
+    /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org --upgrade pip setuptools && \
+    /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org \
+        packaging distro PyYAML jinja2 msgpack requests tornado pycryptodome pyzmq markupsafe cherrypy && \
+    /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org salt
 
-ENTRYPOINT ["salt-master", "-l", "debug"]
+# Create symlinks for salt commands
+RUN for cmd in salt salt-master salt-minion salt-key salt-run salt-call salt-cloud salt-ssh salt-api salt-syndic; do \
+        ln -sf /opt/saltstack/salt/bin/$cmd /usr/local/bin/$cmd 2>/dev/null || true; \
+    done
+
+# Create configuration directories
+RUN mkdir -p /etc/salt /var/cache/salt /var/log/salt /var/run/salt
+
+# Configure master to auto-accept minions and enable Salt API
+# Note: The shared secret can be overridden via SALT_SHARED_SECRET environment variable
+RUN echo "auto_accept: True" > /etc/salt/master && \
+    echo "" >> /etc/salt/master && \
+    echo "# Salt API Configuration" >> /etc/salt/master && \
+    echo "rest_cherrypy:" >> /etc/salt/master && \
+    echo "  port: 8000" >> /etc/salt/master && \
+    echo "  host: 0.0.0.0" >> /etc/salt/master && \
+    echo "  disable_ssl: True  # Enable SSL in production" >> /etc/salt/master && \
+    echo "  debug: True" >> /etc/salt/master && \
+    echo "" >> /etc/salt/master && \
+    echo "# External Authentication - sharedsecret for development" >> /etc/salt/master && \
+    echo "# For production, use PAM or other secure authentication" >> /etc/salt/master && \
+    echo "external_auth:" >> /etc/salt/master && \
+    echo "  sharedsecret:" >> /etc/salt/master && \
+    echo "    salt:" >> /etc/salt/master && \
+    echo "      - '.*'" >> /etc/salt/master && \
+    echo "      - '@wheel'" >> /etc/salt/master && \
+    echo "      - '@runner'" >> /etc/salt/master && \
+    echo "      - '@jobs'" >> /etc/salt/master && \
+    echo "sharedsecret: changeme_insecure_default" >> /etc/salt/master
+
+# Expose Salt ports: 4505 (publish), 4506 (return), 8000 (API)
+EXPOSE 4505 4506 8000
+
+# Start both salt-master and salt-api
+# Note: Use SALT_SHARED_SECRET environment variable to override the default password
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
