@@ -27,19 +27,32 @@ class SaltAPIClient:
     
     def login(self):
         """Authenticate and get token"""
-        response = requests.post(
-            f"{self.api_url}/login",
-            data={
-                "username": self.username,
-                "password": self.password,
-                "eauth": self.eauth
-            },
-            verify=False  # Use verify=True with proper SSL certificates in production
-        )
-        response.raise_for_status()
-        data = response.json()
-        self.token = data["return"][0]["token"]
-        return self.token
+        try:
+            response = requests.post(
+                f"{self.api_url}/login",
+                data={
+                    "username": self.username,
+                    "password": self.password,
+                    "eauth": self.eauth
+                },
+                verify=False  # Use verify=True with proper SSL certificates in production
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            # Validate response structure
+            if not data or "return" not in data or not data["return"]:
+                raise Exception("Invalid login response structure")
+            
+            if "token" not in data["return"][0]:
+                raise Exception("No token in login response")
+            
+            self.token = data["return"][0]["token"]
+            return self.token
+        except requests.exceptions.RequestException as e:
+            raise Exception(f"Login failed: {e}")
+        except (KeyError, IndexError, TypeError) as e:
+            raise Exception(f"Failed to parse login response: {e}")
     
     def execute(self, client="local", tgt="*", fun="test.ping", arg=None):
         """Execute a Salt command"""

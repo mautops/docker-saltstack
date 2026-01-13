@@ -13,6 +13,16 @@ echo "Salt API Test Script"
 echo "==================================="
 echo ""
 
+# Check if jq is available for JSON parsing
+if ! command -v jq &> /dev/null; then
+    echo "WARNING: 'jq' not found. Using basic grep/cut for token extraction."
+    echo "For better JSON parsing, install jq: apt-get install jq or brew install jq"
+    echo ""
+    USE_JQ=false
+else
+    USE_JQ=true
+fi
+
 # Step 1: Login and get token
 echo "1. Logging in to Salt API..."
 LOGIN_RESPONSE=$(curl -sSk "${API_URL}/login" \
@@ -21,7 +31,12 @@ LOGIN_RESPONSE=$(curl -sSk "${API_URL}/login" \
   -d password="${PASSWORD}" \
   -d eauth=sharedsecret)
 
-TOKEN=$(echo "${LOGIN_RESPONSE}" | grep -o '"token":"[^"]*' | cut -d'"' -f4)
+if [ "$USE_JQ" = true ]; then
+    TOKEN=$(echo "${LOGIN_RESPONSE}" | jq -r '.return[0].token // empty')
+else
+    # Fallback to grep/cut with better error handling
+    TOKEN=$(echo "${LOGIN_RESPONSE}" | grep -o '"token":"[^"]*' | head -1 | cut -d'"' -f4)
+fi
 
 if [ -z "$TOKEN" ]; then
   echo "ERROR: Failed to get authentication token"

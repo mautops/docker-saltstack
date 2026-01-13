@@ -9,13 +9,26 @@ MASTER_PID=$!
 # Wait a bit for salt-master to initialize
 sleep 5
 
-# Start salt-api in the foreground
+# Start salt-api in the background
 echo "Starting salt-api..."
 salt-api -l debug &
 API_PID=$!
 
-# Wait for either process to exit
-wait -n $MASTER_PID $API_PID
+# Function to cleanup on exit
+cleanup() {
+    echo "Shutting down..."
+    kill $MASTER_PID $API_PID 2>/dev/null || true
+    wait $MASTER_PID $API_PID 2>/dev/null || true
+}
 
-# Exit with status of process that exited first
-exit $?
+trap cleanup SIGTERM SIGINT
+
+# Wait for both processes, exit if either fails
+while kill -0 $MASTER_PID 2>/dev/null && kill -0 $API_PID 2>/dev/null; do
+    sleep 2
+done
+
+# If we get here, one process has died
+echo "ERROR: One of the Salt processes has exited unexpectedly"
+cleanup
+exit 1
