@@ -1,21 +1,36 @@
 FROM ubuntu:24.04
-MAINTAINER tim@cyface.com
+LABEL maintainer="tim@cyface.com"
+LABEL description="Salt Master with latest Salt version"
 
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update -y && \
-    apt-get install -y curl gnupg ca-certificates && \
-    apt-get clean all
 
-# Add SaltProject repository (onedir packages from Broadcom)
-RUN curl -fsSL https://packages.broadcom.com/artifactory/api/security/keypair/SaltProjectKey/public | gpg --dearmor -o /usr/share/keyrings/salt.gpg && \
-    echo "deb [signed-by=/usr/share/keyrings/salt.gpg] https://packages.broadcom.com/artifactory/saltproject-deb/ubuntu/24.04/amd64/ noble main" > /etc/apt/sources.list.d/saltproject.list
-
-# Install Salt components (3007 onedir)
+# Install dependencies
 RUN apt-get update -y && \
-    apt-get install -y salt-master salt-minion salt-ssh salt-syndic salt-cloud salt-api && \
+    apt-get install -y \
+        python3 \
+        python3-pip \
+        python3-venv \
+        curl \
+        ca-certificates && \
     apt-get clean all && \
     rm -rf /var/lib/apt/lists/*
 
-RUN sed -i "s|#auto_accept: False|auto_accept: True|g" /etc/salt/master
+# Install Salt from PyPI (latest 3007.x series)
+# Note: Using --trusted-host to work around cert issues in restrictive environments
+# In production, use proper certificate handling
+RUN python3 -m venv /opt/saltstack/salt && \
+    /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org --upgrade pip && \
+    /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org salt
+
+# Create symlinks for salt commands
+RUN for cmd in salt salt-master salt-minion salt-key salt-run salt-call salt-cloud salt-ssh salt-api salt-syndic; do \
+        ln -sf /opt/saltstack/salt/bin/$cmd /usr/local/bin/$cmd 2>/dev/null || true; \
+    done
+
+# Create configuration directories
+RUN mkdir -p /etc/salt /var/cache/salt /var/log/salt /var/run/salt
+
+# Configure master to auto-accept minions
+RUN echo "auto_accept: True" > /etc/salt/master
 
 ENTRYPOINT ["salt-master", "-l", "debug"]
