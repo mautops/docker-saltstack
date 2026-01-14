@@ -38,6 +38,12 @@ RUN mkdir -p /etc/salt /var/cache/salt /var/log/salt /var/run/salt
 # Note: The shared secret can be overridden via SALT_SHARED_SECRET environment variable
 RUN echo "auto_accept: True" > /etc/salt/master && \
     echo "" >> /etc/salt/master && \
+    echo "# Enable Salt API clients" >> /etc/salt/master && \
+    echo "netapi_enable_clients:" >> /etc/salt/master && \
+    echo "  - local" >> /etc/salt/master && \
+    echo "  - runner" >> /etc/salt/master && \
+    echo "  - wheel" >> /etc/salt/master && \
+    echo "" >> /etc/salt/master && \
     echo "# Salt API Configuration" >> /etc/salt/master && \
     echo "rest_cherrypy:" >> /etc/salt/master && \
     echo "  port: 8000" >> /etc/salt/master && \
