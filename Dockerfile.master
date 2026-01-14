@@ -12,7 +12,7 @@ RUN apt-get update -y && \
         python3-venv \
         curl \
         ca-certificates && \
-    apt-get clean all && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Salt from PyPI (latest 3007.x series) with all dependencies
@@ -27,46 +27,20 @@ RUN python3 -m venv /opt/saltstack/salt && \
     /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org salt
 
 # Create symlinks for salt commands
-RUN for cmd in salt salt-master salt-minion salt-key salt-run salt-call salt-cloud salt-ssh salt-api salt-syndic; do \
-        ln -sf /opt/saltstack/salt/bin/$cmd /usr/local/bin/$cmd 2>/dev/null || true; \
+RUN for cmd in salt salt-master salt-key salt-run salt-call salt-api; do \
+        ln -sf /opt/saltstack/salt/bin/$cmd /usr/local/bin/$cmd; \
     done
 
 # Create configuration directories
 RUN mkdir -p /etc/salt /var/cache/salt /var/log/salt /var/run/salt
 
-# Configure master to auto-accept minions and enable Salt API
-# Note: The shared secret can be overridden via SALT_SHARED_SECRET environment variable
-RUN echo "auto_accept: True" > /etc/salt/master && \
-    echo "" >> /etc/salt/master && \
-    echo "# Enable Salt API clients" >> /etc/salt/master && \
-    echo "netapi_enable_clients:" >> /etc/salt/master && \
-    echo "  - local" >> /etc/salt/master && \
-    echo "  - runner" >> /etc/salt/master && \
-    echo "  - wheel" >> /etc/salt/master && \
-    echo "" >> /etc/salt/master && \
-    echo "# Salt API Configuration" >> /etc/salt/master && \
-    echo "rest_cherrypy:" >> /etc/salt/master && \
-    echo "  port: 8000" >> /etc/salt/master && \
-    echo "  host: 0.0.0.0" >> /etc/salt/master && \
-    echo "  disable_ssl: True  # Enable SSL in production" >> /etc/salt/master && \
-    echo "  debug: True" >> /etc/salt/master && \
-    echo "" >> /etc/salt/master && \
-    echo "# External Authentication - sharedsecret for development" >> /etc/salt/master && \
-    echo "# For production, use PAM or other secure authentication" >> /etc/salt/master && \
-    echo "external_auth:" >> /etc/salt/master && \
-    echo "  sharedsecret:" >> /etc/salt/master && \
-    echo "    salt:" >> /etc/salt/master && \
-    echo "      - '.*'" >> /etc/salt/master && \
-    echo "      - '@wheel'" >> /etc/salt/master && \
-    echo "      - '@runner'" >> /etc/salt/master && \
-    echo "      - '@jobs'" >> /etc/salt/master && \
-    echo "sharedsecret: changeme_insecure_default" >> /etc/salt/master
+# Copy master configuration
+COPY master.conf /etc/salt/master
 
 # Expose Salt ports: 4505 (publish), 4506 (return), 8000 (API)
 EXPOSE 4505 4506 8000
 
-# Start both salt-master and salt-api
-# Note: Use SALT_SHARED_SECRET environment variable to override the default password
+# Copy and set entrypoint script
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 

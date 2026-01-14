@@ -12,7 +12,7 @@ RUN apt-get update -y && \
         python3-venv \
         curl \
         ca-certificates && \
-    apt-get clean all && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Salt from PyPI (latest 3007.x series) with all dependencies
@@ -27,8 +27,8 @@ RUN python3 -m venv /opt/saltstack/salt && \
     /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org salt
 
 # Create symlinks for salt commands
-RUN for cmd in salt salt-master salt-minion salt-key salt-run salt-call salt-cloud salt-ssh salt-api salt-syndic; do \
-        ln -sf /opt/saltstack/salt/bin/$cmd /usr/local/bin/$cmd 2>/dev/null || true; \
+RUN for cmd in salt salt-minion salt-key salt-call; do \
+        ln -sf /opt/saltstack/salt/bin/$cmd /usr/local/bin/$cmd; \
     done
 
 # Create configuration directories
@@ -37,5 +37,5 @@ RUN mkdir -p /etc/salt /var/cache/salt /var/log/salt /var/run/salt
 # Configure minion to connect to salt-master
 RUN echo "master: salt-master" > /etc/salt/minion
 
-ENTRYPOINT ["salt-minion", "-l", "debug"]
+CMD ["salt-minion", "-l", "debug"]
 

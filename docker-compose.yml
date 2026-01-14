@@ -1,19 +1,25 @@
-version: '3.7'
-
 services: 
   salt-master:
     build:
       context: .
       dockerfile: Dockerfile.master
+    container_name: salt-master
     ports:
       - "4505:4505"  # Salt publish port
       - "4506:4506"  # Salt return port
       - "8000:8000"  # Salt API port
     environment:
       - SALT_SHARED_SECRET=${SALT_SHARED_SECRET:-changeme_insecure_default}
+    volumes:
+      - salt-master-data:/etc/salt/pki
+
   salt-minion:
     build:
       context: .
       dockerfile: Dockerfile.minion
+    container_name: salt-minion
     depends_on:
       - salt-master
+
+volumes:
+  salt-master-data:
