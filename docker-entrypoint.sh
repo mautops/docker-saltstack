@@ -6,7 +6,7 @@ echo "Starting salt-master..."
 salt-master -l debug &
 MASTER_PID=$!
 
-# Wait a bit for salt-master to initialize
+# Wait for salt-master to initialize
 sleep 5
 
 # Start salt-api in the background
@@ -21,14 +21,13 @@ cleanup() {
     wait $MASTER_PID $API_PID 2>/dev/null || true
 }
 
-trap cleanup SIGTERM SIGINT
+trap cleanup SIGTERM SIGINT EXIT
 
-# Wait for both processes, exit if either fails
+# Wait for both processes
 while kill -0 $MASTER_PID 2>/dev/null && kill -0 $API_PID 2>/dev/null; do
     sleep 2
 done
 
 # If we get here, one process has died
 echo "ERROR: One of the Salt processes has exited unexpectedly"
-cleanup
 exit 1
