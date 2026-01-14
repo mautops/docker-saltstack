@@ -22,7 +22,8 @@ RUN apt-get update -y && \
 RUN python3 -m venv /opt/saltstack/salt && \
     /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org --upgrade pip setuptools && \
     /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org \
-        packaging distro PyYAML jinja2 msgpack requests tornado pycryptodome pyzmq markupsafe cherrypy && \
+        packaging distro PyYAML jinja2 msgpack requests tornado pycryptodome pyzmq markupsafe cherrypy \
+        looseversion psutil jmespath && \
     /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org salt
 
 # Create symlinks for salt commands
