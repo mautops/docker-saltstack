@@ -1,34 +1,50 @@
 FROM ubuntu:24.04
 LABEL maintainer="tim@cyface.com"
-LABEL description="Salt Minion with latest Salt version"
+LABEL description="Salt Minion with latest Salt version and node-exporter"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install dependencies
-RUN apt-get update -y && \
+# 拷贝阿里云 Ubuntu 源配置
+COPY config/apt/ubuntu.list /etc/apt/sources.list.d/ubuntu.list
+
+# 删除默认的 ubuntu.sources 文件，确保使用阿里云镜像源
+RUN rm -f /etc/apt/sources.list.d/ubuntu.sources && \
+    ls -la /etc/apt/sources.list.d/ && \
+    cat /etc/apt/sources.list.d/ubuntu.list && \
+    apt-get update -y && \
     apt-get install -y \
-        python3 \
-        python3-pip \
-        python3-venv \
-        curl \
-        ca-certificates && \
+    python3 \
+    python3-pip \
+    python3-venv \
+    curl \
+    ca-certificates && \
+    update-ca-certificates && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+# 拷贝阿里云 pip 源配置
+RUN mkdir -p /root/.pip
+COPY config/pip/pip.conf /root/.pip/pip.conf
+
+# Install node-exporter (使用固定版本避免 GitHub API 限制)
+RUN NODE_EXPORTER_VERSION="1.8.2" && \
+    curl -L -o /tmp/node_exporter.tar.gz \
+    "https://github.com/prometheus/node_exporter/releases/download/v${NODE_EXPORTER_VERSION}/node_exporter-${NODE_EXPORTER_VERSION}.linux-amd64.tar.gz" && \
+    tar xzf /tmp/node_exporter.tar.gz -C /tmp && \
+    cp /tmp/node_exporter-${NODE_EXPORTER_VERSION}.linux-amd64/node_exporter /usr/local/bin/ && \
+    rm -rf /tmp/node_exporter.tar.gz /tmp/node_exporter-${NODE_EXPORTER_VERSION}.linux-amd64
+
 # Install Salt from PyPI (latest 3007.x series) with all dependencies
-# SECURITY NOTE: Using --trusted-host flags to bypass SSL verification
-# This is ONLY for development/testing in restricted network environments
-# For production, ensure proper CA certificates are installed and remove --trusted-host flags
 RUN python3 -m venv /opt/saltstack/salt && \
-    /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org --upgrade pip setuptools && \
-    /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org \
-        packaging distro PyYAML jinja2 msgpack requests tornado pycryptodome pyzmq markupsafe \
-        looseversion psutil jmespath cryptography && \
-    /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org salt
+    /opt/saltstack/salt/bin/pip install --upgrade pip setuptools && \
+    /opt/saltstack/salt/bin/pip install \
+    packaging distro PyYAML jinja2 msgpack requests tornado pycryptodome pyzmq markupsafe \
+    looseversion psutil jmespath cryptography && \
+    /opt/saltstack/salt/bin/pip install salt
 
 # Create symlinks for salt commands
 RUN for cmd in salt salt-minion salt-key salt-call; do \
-        ln -sf /opt/saltstack/salt/bin/$cmd /usr/local/bin/$cmd; \
+    ln -sf /opt/saltstack/salt/bin/$cmd /usr/local/bin/$cmd; \
     done
 
 # Create configuration directories
@@ -37,5 +53,11 @@ RUN mkdir -p /etc/salt /var/cache/salt /var/log/salt /var/run/salt
 # Configure minion to connect to salt-master
 RUN echo "master: salt-master" > /etc/salt/minion
 
-CMD ["salt-minion", "-l", "debug"]
+# Create startup script to run both salt-minion and node-exporter
+RUN echo '#!/bin/bash' > /usr/local/bin/start-services.sh && \
+    echo 'node_exporter &' >> /usr/local/bin/start-services.sh && \
+    echo 'salt-minion -l debug' >> /usr/local/bin/start-services.sh && \
+    chmod +x /usr/local/bin/start-services.sh
+
+CMD ["/usr/local/bin/start-services.sh"]
 

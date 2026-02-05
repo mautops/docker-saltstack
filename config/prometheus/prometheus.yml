@@ -1,0 +1,48 @@
+# Prometheus 配置文件
+# 全局配置
+global:
+  scrape_interval: 15s  # 抓取间隔
+  evaluation_interval: 15s  # 评估间隔
+
+# 告警配置
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# 规则配置
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+# 抓取配置
+scrape_configs:
+  # 抓取 node-exporter 数据（支持多个 minion 实例）
+  - job_name: 'node-exporter'
+    dns_sd_configs:
+      - names:
+          - 'tasks.salt-minion'  # Docker Swarm 模式的服务发现
+        type: 'A'
+        port: 9100
+    # 如果不在 Swarm 模式，使用静态配置
+    static_configs:
+      - targets:
+          - 'docker-saltstack-salt-minion-1:9100'
+          - 'docker-saltstack-salt-minion-2:9100'
+          - 'docker-saltstack-salt-minion-3:9100'
+          - 'docker-saltstack-salt-minion-4:9100'
+    # 自动移除不可达的目标
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+  # 抓取 Prometheus 自身数据
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # 抓取 Grafana 自身数据
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']

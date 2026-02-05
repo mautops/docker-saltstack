@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.master
+    platform: linux/amd64  # 强制使用 AMD64 架构以兼容阿里云镜像源
     container_name: salt-master
     ports:
       - "4505:4505"  # Salt publish port
@@ -15,6 +16,32 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.minion
+    platform: linux/amd64  # 强制使用 AMD64 架构以兼容阿里云镜像源
     depends_on:
       - salt-master
+    # 移除端口映射，避免 scale 时端口冲突
+    # Prometheus 通过 Docker 网络访问 minion:9100
+    expose:
+      - "9100"  # 仅在 Docker 网络内暴露端口
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"  # Prometheus web interface
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - salt-minion
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"  # Grafana web interface
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
 
