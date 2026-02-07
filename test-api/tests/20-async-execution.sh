@@ -36,7 +36,7 @@ if is_valid_json "${response}"; then
     fi
 else
     print_warning "Async execution failed"
-    print_info "Ensure 'local_async' is enabled in master.conf"
+    print_info "Ensure 'local_async' is enabled in config/salt/master.conf"
     print_result "${response}"
     exit 1
 fi

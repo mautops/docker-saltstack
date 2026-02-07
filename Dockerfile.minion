@@ -4,6 +4,9 @@ LABEL description="Salt Minion with latest Salt version"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Configure清华源 for faster package installation
+COPY config/apt/ubuntu.sources /etc/apt/sources.list.d/ubuntu.sources
+
 # Install dependencies
 RUN apt-get update -y && \
     apt-get install -y \
@@ -11,20 +14,21 @@ RUN apt-get update -y && \
         python3-pip \
         python3-venv \
         curl \
+        wget \
         ca-certificates && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Salt from PyPI (latest 3007.x series) with all dependencies
-# SECURITY NOTE: Using --trusted-host flags to bypass SSL verification
-# This is ONLY for development/testing in restricted network environments
-# For production, ensure proper CA certificates are installed and remove --trusted-host flags
+# Copy pip configuration for Aliyun mirror
+COPY config/pip/pip.conf /etc/pip.conf
+
+# Install Salt from PyPI (latest 3007.x series) with all dependencies using Aliyun mirror
 RUN python3 -m venv /opt/saltstack/salt && \
-    /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org --upgrade pip setuptools && \
-    /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org \
+    /opt/saltstack/salt/bin/pip install --upgrade pip setuptools && \
+    /opt/saltstack/salt/bin/pip install \
         packaging distro PyYAML jinja2 msgpack requests tornado pycryptodome pyzmq markupsafe \
         looseversion psutil jmespath cryptography && \
-    /opt/saltstack/salt/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org salt
+    /opt/saltstack/salt/bin/pip install salt
 
 # Create symlinks for salt commands
 RUN for cmd in salt salt-minion salt-key salt-call; do \
@@ -37,5 +41,22 @@ RUN mkdir -p /etc/salt /var/cache/salt /var/log/salt /var/run/salt
 # Configure minion to connect to salt-master
 RUN echo "master: salt-master" > /etc/salt/minion
 
-CMD ["salt-minion", "-l", "debug"]
+# Copy Node Exporter installation files
+COPY scripts/installation/node_exporter.sh /tmp/
+COPY scripts/installation/node_exporter-1.10.2.linux-arm64.tar.gz /tmp/
+
+# Install Node Exporter 1.10.2 using local archive
+RUN chmod +x /tmp/node_exporter.sh && \
+    /tmp/node_exporter.sh && \
+    rm /tmp/node_exporter.sh && \
+    rm /tmp/node_exporter-1.10.2.linux-arm64.tar.gz
+
+# Copy and set entrypoint script
+COPY scripts/minion-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/minion-entrypoint.sh
+
+# Expose Node Exporter port
+EXPOSE 9100
+
+ENTRYPOINT ["/usr/local/bin/minion-entrypoint.sh"]
 
