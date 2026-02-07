@@ -1,0 +1,124 @@
+# 常用的 Prometheus 告警规则
+
+groups:
+  # 系统基础监控告警组
+  - name: system_alerts
+    rules:
+      # 主机宕机告警
+      - alert: InstanceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "实例 {{ $labels.instance }} 已宕机"
+          description: "{{ $labels.instance }} 已经超过1分钟无法访问"
+
+      # CPU 使用率过高告警
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "主机 {{ $labels.instance }} CPU 使用率过高"
+          description: "CPU 使用率达到 {{ $value }}%，超过阈值 80%"
+
+      # 内存使用率过高告警
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "主机 {{ $labels.instance }} 内存使用率过高"
+          description: "内存使用率达到 {{ $value }}%，超过阈值 85%"
+
+      # 磁盘空间不足告警
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "主机 {{ $labels.instance }} 磁盘空间不足"
+          description: "磁盘 {{ $labels.mountpoint }} 使用率达到 {{ $value }}%，超过阈值 90%"
+
+      # 磁盘 inode 不足告警
+      - alert: DiskInodesLow
+        expr: (node_filesystem_files - node_filesystem_files_free) / node_filesystem_files * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "主机 {{ $labels.instance }} inode 不足"
+          description: "磁盘 {{ $labels.mountpoint }} inode 使用率达到 {{ $value }}%，超过阈值 90%"
+
+  # 网络监控告警组
+  - name: network_alerts
+    rules:
+      # 网络接口接收错误过多
+      - alert: NetworkReceiveErrors
+        expr: rate(node_network_receive_errs_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "网络接口 {{ $labels.device }} 接收错误过多"
+          description: "接口 {{ $labels.device }} 接收错误率 {{ $value }}，超过阈值 10 errors/sec"
+
+      # 网络接口发送错误过多
+      - alert: NetworkTransmitErrors
+        expr: rate(node_network_transmit_errs_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "网络接口 {{ $labels.device }} 发送错误过多"
+          description: "接口 {{ $labels.device }} 发送错误率 {{ $value }}，超过阈值 10 errors/sec"
+
+  # 服务监控告警组
+  - name: service_alerts
+    rules:
+      # Node Exporter 服务不可用
+      - alert: NodeExporterDown
+        expr: absent(up{job="node-exporter"})
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node Exporter 服务不可用"
+          description: "无法检测到 Node Exporter 服务运行状态"
+
+      # Prometheus 自身监控
+      - alert: PrometheusConfigReloadFailed
+        expr: prometheus_config_last_reload_successful == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus 配置重载失败"
+          description: "Prometheus 配置文件重载失败，请检查配置"
+
+      # 告警过多告警（元告警）
+      - alert: TooManyAlerts
+        expr: sum(ALERTS) > 20
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "告警数量过多"
+          description: "当前活跃告警数量达到 {{ $value }}，可能存在系统性问题"
+
+  # 负载监控告警组
+  - name: load_alerts
+    rules:
+      # 系统负载过高
+      - alert: HighLoadAverage
+        expr: node_load1 > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "主机 {{ $labels.instance }} 负载过高"
+          description: "1分钟平均负载达到 {{ $value }}，超过阈值 5"

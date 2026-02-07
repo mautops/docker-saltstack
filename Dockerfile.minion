@@ -36,10 +36,13 @@ RUN for cmd in salt salt-minion salt-key salt-call; do \
     done
 
 # Create configuration directories
-RUN mkdir -p /etc/salt /var/cache/salt /var/log/salt /var/run/salt
+RUN mkdir -p /etc/salt /var/cache/salt /var/log/salt /var/run/salt && \
+    chmod 777 /var/log/salt /var/run/salt /etc/salt
 
 # Configure minion to connect to salt-master
-RUN echo "master: salt-master" > /etc/salt/minion
+RUN echo "master: salt-master" > /etc/salt/minion && \
+    echo "log_file: /tmp/salt/minion.log" >> /etc/salt/minion && \
+    echo "log_level: debug" >> /etc/salt/minion
 
 # Copy Node Exporter installation files
 COPY scripts/installation/node_exporter.sh /tmp/
@@ -50,6 +53,12 @@ RUN chmod +x /tmp/node_exporter.sh && \
     /tmp/node_exporter.sh && \
     rm /tmp/node_exporter.sh && \
     rm /tmp/node_exporter-1.10.2.linux-arm64.tar.gz
+
+# Install Filebeat for log collection
+COPY scripts/installation/filebeat.sh /tmp/
+RUN chmod +x /tmp/filebeat.sh && \
+    /tmp/filebeat.sh && \
+    rm /tmp/filebeat.sh
 
 # Copy and set entrypoint script
 COPY scripts/minion-entrypoint.sh /usr/local/bin/

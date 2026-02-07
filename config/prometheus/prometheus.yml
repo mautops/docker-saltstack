@@ -1,0 +1,33 @@
+# Prometheus 配置文件
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Alertmanager 配置
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# 加载规则文件
+rule_files:
+  - "rules.yml"
+
+# 抓取配置
+scrape_configs:
+  # Node Exporter 指标抓取配置
+  - job_name: 'node-exporter'
+    # 第一性原理：利用 Docker 内置 DNS 服务发现
+    dns_sd_configs:
+      - names: ['salt-minion']
+        type: A
+        port: 9100
+    # 基本抓取配置
+    scrape_interval: 10s
+    scrape_timeout: 10s
+
+  # Prometheus 自身指标（可选）
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

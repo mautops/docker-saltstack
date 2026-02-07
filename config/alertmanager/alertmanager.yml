@@ -1,0 +1,74 @@
+# Alertmanager 配置文件
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: 'localhost:25'
+  smtp_from: 'alertmanager@example.com'
+  smtp_require_tls: false
+
+# 告警抑制规则
+inhibit_rules:
+  # 当实例宕机时，抑制该实例的所有其他告警
+  - source_match:
+      severity: 'critical'
+      alertname: 'InstanceDown'
+    target_match:
+      severity: 'warning'
+    equal: ['instance']
+
+# 告警路由配置
+route:
+  # 默认接收者
+  receiver: 'default-receiver'
+  # 告警分组等待时间
+  group_wait: 30s
+  # 告警分组间隔
+  group_interval: 5m
+  # 重复告警间隔
+  repeat_interval: 3h
+  # 路由匹配规则
+  routes:
+    # 关键告警路由
+    - receiver: 'critical-alerts'
+      group_by: ['alertname', 'job']
+      match:
+        severity: 'critical'
+      continue: true
+    
+    # 警告级别告警路由
+    - receiver: 'warning-alerts'
+      group_by: ['alertname', 'job']
+      match:
+        severity: 'warning'
+      continue: true
+    
+    # Node Exporter 相关告警
+    - receiver: 'node-alerts'
+      match:
+        job: 'node-exporter'
+      continue: true
+
+# 接收者配置
+receivers:
+  # 默认接收者（控制台输出）
+  - name: 'default-receiver'
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook'
+        send_resolved: true
+
+  # 关键告警接收者
+  - name: 'critical-alerts'
+    webhook_configs:
+      - url: 'http://localhost:5001/critical'
+        send_resolved: true
+
+  # 警告级别接收者
+  - name: 'warning-alerts'
+    webhook_configs:
+      - url: 'http://localhost:5001/warning'
+        send_resolved: true
+
+  # Node 相关告警接收者
+  - name: 'node-alerts'
+    webhook_configs:
+      - url: 'http://localhost:5001/node'
+        send_resolved: true

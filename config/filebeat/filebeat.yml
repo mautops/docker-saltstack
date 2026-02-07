@@ -1,0 +1,91 @@
+---
+## Filebeat 配置文件
+## 用于收集系统日志并发送到 ElasticSearch
+
+###################### Filebeat 配置示例 ######################
+filebeat.inputs:
+
+# 收集系统日志
+- type: log
+  enabled: true
+  paths:
+    - /var/log/*.log
+    - /var/log/apk.log
+    - /tmp/test-filebeat.log
+  fields:
+    service: "system"
+    log_type: "system_log"
+  fields_under_root: true
+  # ignore_older: 72h  # 注释掉避免过滤旧日志
+
+# 收集 Salt Minion 日志
+- type: log
+  enabled: true
+  paths:
+    - /var/log/salt/minion
+    - /etc/salt/minion.log
+  fields:
+    service: "salt-minion"
+    log_type: "salt_log"
+  fields_under_root: true
+  multiline.pattern: '^\d{4}-\d{2}-\d{2}'
+  multiline.negate: true
+  multiline.match: after
+  # ignore_older: 72h  # 注释掉避免过滤旧日志
+
+# 收集应用程序日志（可选）
+- type: log
+  enabled: false
+  paths:
+    - /var/log/application/*.log
+  fields:
+    service: "application"
+    log_type: "app_log"
+  fields_under_root: true
+
+###################### 输出配置 ######################
+# 输出到 ElasticSearch
+output.elasticsearch:
+  hosts: ["elasticsearch:9200"]
+  index: "filebeat-%{[agent.version]}-%{+yyyy.MM.dd}"
+  bulk_max_size: 1024
+
+# 启用 Kibana 仪表板加载（暂时禁用以避免启动问题）
+# setup.kibana:
+#   host: "kibana:5601"
+
+# 加载预定义的仪表板（暂时禁用）
+# setup.dashboards.enabled: true
+
+# 加载索引模板
+setup.template.enabled: true
+setup.template.name: "filebeat"
+setup.template.pattern: "filebeat-*"
+
+###################### 处理器配置 ######################
+processors:
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+  - add_cloud_metadata: ~
+  - add_docker_metadata: ~
+  - add_kubernetes_metadata: ~
+
+###################### 日志配置 ######################
+logging.level: info
+logging.to_files: false
+logging.to_syslog: false
+logging.metrics.enabled: false
+
+###################### 全局配置 ######################
+filebeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: false
+
+# 注册表文件路径
+filebeat.registry.path: ${path.data}/registry
+
+# 存储队列配置
+queue.mem:
+  events: 4096
+  flush.min_events: 512
+  flush.timeout: 5s

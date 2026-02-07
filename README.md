@@ -1,15 +1,17 @@
 # docker-saltstack
 
-Docker Compose setup to spin up a Salt master and minions with the latest SaltProject version.
+Docker Compose setup to spin up a Salt master and minions with the latest SaltProject version, integrated with Prometheus monitoring stack including Alertmanager.
 
-## Current Version
+## Features
 
-This project now uses **Salt 3007.11** (latest stable release as of January 2026), installed via PyPI in a Python virtual environment. This approach provides:
-
-- Modern "onedir-style" packaging with isolated dependencies
-- Latest security updates and features
-- Ubuntu 24.04 LTS base image
-- Easy version management and upgrades
+- ✅ SaltStack 3007.11 with modern Python virtual environment
+- ✅ Prometheus monitoring with Node Exporter
+- ✅ Grafana dashboard with automated provisioning
+- ✅ Alertmanager with comprehensive alerting rules
+- ✅ **ELK Stack for log collection and analysis**
+- ✅ **Filebeat integration for system log shipping**
+- ✅ Pre-configured system, network, and service alerts
+- ✅ Ubuntu 24.04 LTS base image
 
 ## Quick Start
 
@@ -22,6 +24,58 @@ Just run:
 `./start.sh`
 
 from a checkout of this directory, and the master and minion will start up with debug logging to the console.
+
+## 🚨 Alertmanager 集成
+
+本项目现已集成完整的告警管理系统：
+
+### 已配置的告警规则
+
+- **系统监控**: 主机宕机、CPU/内存使用率过高、磁盘空间不足
+- **网络监控**: 网络接口错误率监控
+- **服务监控**: Node Exporter 状态、Prometheus 配置重载状态
+- **负载监控**: 系统负载平均值监控
+
+### 访问地址
+
+- **Alertmanager UI**: http://localhost:9093
+- **Prometheus Alerts**: http://localhost:9090/alerts
+
+### 测试告警配置
+
+```bash
+# 验证配置文件
+./test-alertmanager.sh
+```
+
+## 📊 ELK 日志分析系统
+
+本项目现已集成完整的日志收集和分析系统：
+
+### 已配置的组件
+
+- **Elasticsearch**: 分布式搜索引擎和日志存储
+- **Kibana**: 日志可视化和分析平台
+- **Filebeat**: 轻量级日志收集器（集成在 minion 中）
+
+### 收集的日志类型
+
+- 系统日志 (/var/log/\*.log)
+- Salt Minion 日志
+- 认证日志 (/var/log/auth.log)
+- 内核日志 (/var/log/kern.log)
+
+### 访问地址
+
+- **Kibana UI**: http://localhost:5601
+- **Elasticsearch API**: http://localhost:9200
+
+### 测试日志收集配置
+
+```bash
+# 验证 ELK 系统
+./test-elk.sh
+```
 
 To stop the services, run:
 
